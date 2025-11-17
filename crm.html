@@ -1,0 +1,359 @@
+<!DOCTYPE html>
+<html lang="pt-br" class="dark">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Painel CRM</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <style>
+        body {
+            font-family: 'Inter', sans-serif;
+        }
+        
+        /* Estilo para o Toast (notificação) */
+        #toast {
+            position: fixed;
+            bottom: 20px;
+            right: 20px;
+            padding: 1rem 1.5rem;
+            border-radius: 0.5rem;
+            font-weight: 500;
+            box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05);
+            transition: all 0.3s ease-in-out;
+            opacity: 0;
+            transform: translateY(20px);
+            z-index: 50;
+        }
+        #toast.show {
+            opacity: 1;
+            transform: translateY(0);
+        }
+
+        /* NOVAS ANIMAÇÕES */
+        @keyframes fadeInUp {
+            from {
+                opacity: 0;
+                transform: translateY(20px);
+            }
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+
+        .animate-fadeInUp {
+            animation: fadeInUp 0.6s ease-out both;
+        }
+
+        .delay-200 {
+            animation-delay: 200ms;
+        }
+    </style>
+</head>
+<body class="bg-gray-900 text-gray-100 min-h-screen p-8">
+
+    <div class="container mx-auto max-w-5xl">
+        <h1 class="text-3xl font-bold text-center mb-8 bg-clip-text text-transparent bg-gradient-to-r from-blue-400 to-teal-400 animate-fadeInUp">
+            Painel de Clientes (Meu CRM)
+        </h1>
+
+        <div class="grid grid-cols-1 md:grid-cols-3 gap-8">
+            
+            <div class="md:col-span-1 bg-gray-800 p-6 rounded-lg shadow-lg animate-fadeInUp delay-200">
+                <h2 id="form-title" class="text-2xl font-semibold mb-4">Adicionar Cliente</h2>
+                <form id="client-form" class="space-y-4">
+                    <div>
+                        <label for="nome" class="block text-sm font-medium text-gray-300">Nome</label>
+                        <input type="text" id="nome" name="nome" required
+                               class="mt-1 block w-full bg-gray-700 border-gray-600 rounded-md shadow-sm text-gray-100 p-2 focus:ring-blue-500 focus:border-blue-500 transition duration-300">
+                    </div>
+                    <div>
+                        <label for="email" class="block text-sm font-medium text-gray-300">Email</label>
+                        <input type="email" id="email" name="email" required
+                               class="mt-1 block w-full bg-gray-700 border-gray-600 rounded-md shadow-sm text-gray-100 p-2 focus:ring-blue-500 focus:border-blue-500 transition duration-300 disabled:opacity-50 disabled:cursor-not-allowed">
+                    </div>
+                    <div>
+                        <label for="telefone" class="block text-sm font-medium text-gray-300">Telefone</label>
+                        <input type="tel" id="telefone" name="telefone"
+                               class="mt-1 block w-full bg-gray-700 border-gray-600 rounded-md shadow-sm text-gray-100 p-2 focus:ring-blue-500 focus:border-blue-500 transition duration-300">
+                    </div>
+                    <div>
+                        <label for="empresa" class="block text-sm font-medium text-gray-300">Empresa</label>
+                        <input type="text" id="empresa" name="empresa"
+                               class="mt-1 block w-full bg-gray-700 border-gray-600 rounded-md shadow-sm text-gray-100 p-2 focus:ring-blue-500 focus:border-blue-500 transition duration-300">
+                    </div>
+                    <div class="flex space-x-4 pt-2">
+                        <button type="submit" id="submit-btn"
+                                class="w-full bg-blue-600 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded-lg shadow-md transition duration-300">
+                            Salvar Cliente
+                        </button>
+                        <button type="button" id="cancel-edit-btn" onclick="cancelEdit()"
+                                class="w-full bg-gray-600 hover:bg-gray-700 text-white font-bold py-2 px-4 rounded-lg shadow-md transition duration-300 hidden">
+                            Cancelar
+                        </button>
+                    </div>
+                </form>
+            </div>
+
+            <div class="md:col-span-2 bg-gray-800 p-6 rounded-lg shadow-lg animate-fadeInUp delay-200">
+                <h2 class="text-2xl font-semibold mb-4">Clientes Cadastrados</h2>
+                <div class="overflow-x-auto">
+                    <table class="min-w-full divide-y divide-gray-700">
+                        <thead class="bg-gray-700">
+                            <tr>
+                                <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-300 uppercase tracking-wider">Nome</th>
+                                <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-300 uppercase tracking-wider">Email</th>
+                                <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-300 uppercase tracking-wider">Telefone</th>
+                                <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-300 uppercase tracking-wider">Ações</th>
+                            </tr>
+                        </thead>
+                        <tbody id="client-list-tbody" class="bg-gray-800 divide-y divide-gray-700">
+                            </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div id="toast"></div>
+
+    <script>
+        // O endereço onde sua API (Back-end) está rodando
+        const API_URL = 'http://127.0.0.1:8000';
+
+        // Elementos do DOM
+        const clientForm = document.getElementById('client-form');
+        const clientListTbody = document.getElementById('client-list-tbody');
+        const toastEl = document.getElementById('toast');
+        const formTitle = document.getElementById('form-title');
+        const submitBtn = document.getElementById('submit-btn');
+        const cancelBtn = document.getElementById('cancel-edit-btn');
+        const emailInput = document.getElementById('email');
+
+        // Estado da Aplicação
+        let toastTimeout;
+        let editingClientId = null;
+        let currentClients = []; // Cache para guardar os clientes buscados
+
+        // ---
+        // MOSTRA UMA NOTIFICAÇÃO (Toast)
+        // ---
+        function showToast(message, isError = false) {
+            toastEl.textContent = message;
+            toastEl.className = isError 
+                ? 'bg-red-500 text-white' 
+                : 'bg-green-500 text-white';
+            
+            toastEl.classList.add('show');
+            
+            clearTimeout(toastTimeout);
+            toastTimeout = setTimeout(() => {
+                toastEl.classList.remove('show');
+            }, 3000);
+        }
+
+        // ---
+        // 1. FUNÇÃO PARA BUSCAR E EXIBIR OS CLIENTES (READ)
+        // ---
+        async function fetchClients() {
+            // Mostra um estado de carregamento
+            clientListTbody.innerHTML = '<tr><td colspan="4" class="px-6 py-4 text-center text-gray-400">Carregando clientes...</td></tr>';
+
+            try {
+                const response = await fetch(`${API_URL}/clientes/?limit=100`);
+                if (!response.ok) {
+                    throw new Error('Erro ao buscar clientes');
+                }
+                const clients = await response.json();
+                currentClients = clients; // Atualiza o cache de clientes
+
+                clientListTbody.innerHTML = ''; // Limpa a tabela
+
+                if (clients.length === 0) {
+                    clientListTbody.innerHTML = '<tr><td colspan="4" class="px-6 py-4 text-center text-gray-400">Nenhum cliente cadastrado.</td></tr>';
+                    return;
+                }
+
+                clients.forEach(client => {
+                    const row = document.createElement('tr');
+                    // Adiciona efeito de hover e transição nas linhas
+                    row.className = "hover:bg-gray-750 transition-colors duration-200";
+                    
+                    row.innerHTML = `
+                        <td class="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-100">${client.nome}</td>
+                        <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-300">${client.email}</td>
+                        <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-300">${client.telefone || 'N/A'}</td>
+                        <td class="px-6 py-4 whitespace-nowrap text-sm font-medium">
+                            <div class="flex space-x-4">
+                                <button onclick="editClient(${client.id})" class="text-blue-400 hover:text-blue-600 transition duration-300">
+                                    Editar
+                                </button>
+                                <button onclick="deleteClient(${client.id})" class="text-red-500 hover:text-red-700 transition duration-300">
+                                    Deletar
+                                </button>
+                            </div>
+                        </td>
+                    `;
+                    clientListTbody.appendChild(row);
+                });
+            } catch (error) {
+                console.error('Falha detalhada ao buscar clientes:', error);
+                let errorMsg = 'Erro ao buscar clientes. O servidor (API) está rodando?';
+                if (error instanceof TypeError && error.message === 'Failed to fetch') {
+                    errorMsg = 'Falha de rede. Verifique se a API (crm_api.py) está em execução.';
+                }
+                showToast(errorMsg, true);
+                clientListTbody.innerHTML = `
+                    <tr>
+                        <td colspan="4" class="px-6 py-4 text-center text-red-400">${errorMsg}</td>
+                    </tr>
+                `;
+            }
+        }
+
+        // ---
+        // 2. FUNÇÃO PARA INICIAR A EDIÇÃO (NOVO)
+        // ---
+        function editClient(id) {
+            const client = currentClients.find(c => c.id === id);
+            if (!client) return;
+
+            // Define o estado de edição
+            editingClientId = id;
+
+            // Preenche o formulário
+            document.getElementById('nome').value = client.nome;
+            emailInput.value = client.email;
+            emailInput.disabled = true; // Bloqueia o campo de e-mail
+            document.getElementById('telefone').value = client.telefone || '';
+            document.getElementById('empresa').value = client.empresa || '';
+
+            // Atualiza a UI do formulário
+            formTitle.textContent = 'Atualizar Cliente';
+            submitBtn.textContent = 'Atualizar Cliente';
+            cancelBtn.classList.remove('hidden');
+
+            // Foca no formulário
+            clientForm.scrollIntoView({ behavior: 'smooth', block: 'start' });
+        }
+
+        // ---
+        // 3. FUNÇÃO PARA CANCELAR A EDIÇÃO (NOVO)
+        // ---
+        function cancelEdit() {
+            editingClientId = null;
+            clientForm.reset(); // Limpa o formulário
+
+            emailInput.disabled = false; // Desbloqueia o e-mail
+
+            // Reseta a UI do formulário
+            formTitle.textContent = 'Adicionar Cliente';
+            submitBtn.textContent = 'Salvar Cliente';
+            cancelBtn.classList.add('hidden');
+        }
+
+        // ---
+        // 4. FUNÇÃO PARA ENVIAR O FORMULÁRIO (CREATE ou UPDATE)
+        // ---
+        clientForm.addEventListener('submit', async (event) => {
+            event.preventDefault(); 
+
+            let url = `${API_URL}/clientes/`;
+            let method = 'POST';
+            
+            // Prepara os dados. Note que o e-mail não é enviado no PATCH.
+            let clientData = {
+                nome: document.getElementById('nome').value,
+                telefone: document.getElementById('telefone').value || null,
+                empresa: document.getElementById('empresa').value || null,
+            };
+
+            if (editingClientId) {
+                // Modo UPDATE (PATCH)
+                url = `${API_URL}/clientes/${editingClientId}`;
+                method = 'PATCH';
+                // O e-mail não é enviado no corpo do PATCH
+            } else {
+                // Modo CREATE (POST)
+                // Adiciona o e-mail apenas na criação
+                clientData.email = emailInput.value;
+            }
+
+            try {
+                const response = await fetch(url, {
+                    method: method,
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify(clientData),
+                });
+
+                if (!response.ok) {
+                    const errorData = await response.json();
+                    throw new Error(errorData.detail || 'Erro ao salvar cliente');
+                }
+
+                if (editingClientId) {
+                    showToast('Cliente atualizado com sucesso!');
+                    cancelEdit(); // Reseta o formulário após a edição
+                } else {
+                    showToast('Cliente criado com sucesso!');
+                    clientForm.reset(); // Limpa o formulário após a criação
+                }
+                
+                fetchClients(); // Atualiza a lista de clientes
+                
+            } catch (error) {
+                console.error('Falha detalhada ao salvar cliente:', error);
+                let errorMsg = error.message;
+                
+                if (error instanceof TypeError && error.message === 'Failed to fetch') {
+                    errorMsg = 'Falha de rede. A API está rodando?';
+                }
+                showToast(errorMsg, true);
+            }
+        });
+
+        // ---
+        // 5. FUNÇÃO PARA DELETAR UM CLIENTE (DELETE)
+        // ---
+        async function deleteClient(id) {
+            // Adiciona uma confirmação antes de deletar
+            if (!confirm('Tem certeza que deseja deletar este cliente?')) {
+                return;
+            }
+            
+            try {
+                const response = await fetch(`${API_URL}/clientes/${id}`, {
+                    method: 'DELETE',
+                });
+
+                if (!response.ok) {
+                    const errorData = await response.json();
+                    throw new Error(errorData.detail || 'Erro ao deletar cliente');
+                }
+
+                showToast('Cliente deletado com sucesso!');
+                fetchClients(); // Atualiza a lista
+                
+            } catch (error) {
+                console.error('Falha detalhada ao deletar cliente:', error);
+                let errorMsg = error.message;
+                if (error instanceof TypeError && error.message === 'Failed to fetch') {
+                    errorMsg = 'Falha de rede ao deletar. A API está rodando?';
+                }
+                showToast(errorMsg, true);
+            }
+        }
+
+        // ---
+        // RODA A FUNÇÃO INICIAL PARA CARREGAR OS CLIENTES
+        // ---
+        document.addEventListener('DOMContentLoaded', fetchClients);
+
+    </script>
+</body>
+</html>
